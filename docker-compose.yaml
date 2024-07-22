@@ -1,0 +1,83 @@
+version: "3.8"
+
+services:
+  db:
+    image: mysql
+    ports:
+      - 3305:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: root1234
+      MYSQL_DATABASE: superstore_dataset
+    restart: always
+    volumes:
+      - db_volume:/var/lib/mysql
+  migrate:
+    depends_on:
+      - db
+    image: migrate/migrate
+    volumes:
+      - ./migration/database:/migrations
+    command:
+      [
+        "-path",
+        "/migrations",
+        "-database",
+        "mysql://root:root1234@tcp(db:3306)/superstore_dataset?parseTime=true",
+        "up",
+      ]
+  seeder:
+    image: kuroyamii/forecasting-seeder:1.0
+    depends_on:
+      - migrate
+    environment:
+      HOST: db
+      DB_USER: root
+      DB_PASSWORD: root1234
+      DB_NAME: superstore_dataset
+  flask:
+    depends_on:
+      - seeder
+    image: "kuroyamii/forecasting-flask:1.0"
+    restart: always
+    environment:
+      SERVER_ADDRESS: 8181
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: root1234
+      DB_NAME: superstore_dataset
+    ports:
+      - 8181:8181
+  backend:
+    image: "kuroyamii/forecasting-be:1.0"
+    restart: always
+    depends_on:
+      - flask
+    environment:
+      SERVER_ADDRESS: :8080
+      WHITELISTED_URLS: http://localhost:3000
+      DB_ADDRESS: db:3306
+      DB_NAME: superstore_dataset
+      DB_UNAME: root
+      DB_PASSWORD: root1234
+      PASSWORD_HASH_KEY: yang bener aja
+      JWT_KEY: rugi dong
+      ACCESS_TOKEN_TTL_HOUR: 1
+      REFRESH_TOKEN_TTL_HOUR: 24
+      CONFIG_SMTP_PORT: 587
+      CONFIG_SMTP_HOST: smtp.gmail.com
+      CONFIG_SENDER_NAME: Admin <email@gmail.com>
+      CONFIG_AUTH_EMAIL:
+      CONFIG_AUTH_PASSWORD:
+      FORECAST_API_ADDRESS: http://flask:8181/forecast
+    ports:
+      - 8080:8080
+  frontend:
+    image: "kuroyamii/forecasting-fe:1.0"
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - 3000:3000
+
+volumes:
+  db_volume:
